@@ -1,0 +1,20 @@
+{
+  "name": "realtime-clipboard",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "start": "cd apps/server && node dist/index.js"
+  },
+  "dependencies": {
+    "turbo": "^1.13.0",
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
