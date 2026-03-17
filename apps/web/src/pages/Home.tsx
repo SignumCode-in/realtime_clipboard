@@ -31,11 +31,11 @@ export default function Home() {
               <span>Realtime clipboard sync</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 leading-[1.1]">
-              Share text across <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
-                devices instantly
-              </span>
+              Realtime Clipboard
             </h1>
+            <h2 className="mt-2 text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+              Share Text Instantly Between Devices
+            </h2>
             <p className="mt-4 text-lg text-gray-600 max-w-md">
               A frictionless way to copy-paste between your phone, tablet, and computer. No login required.
             </p>
@@ -105,6 +105,52 @@ export default function Home() {
         </div>
 
       </div>
+
+      {/* SEO Landing Section */}
+      <section className="w-full max-w-4xl mt-24 mb-16 px-4">
+        <div className="grid md:grid-cols-2 gap-12 border-t border-gray-100 pt-16">
+          <article className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-900">Why use Realtime Clipboard?</h2>
+            <p className="text-gray-600 leading-relaxed">
+              Realtime Clipboard is a powerful, instant text sharing tool designed to bridge the gap between your devices. 
+              Whether you're moving a URL from your phone to your PC, or a code snippet between two laptops, 
+              our platform makes it as simple as copy and paste.
+            </p>
+            <p className="text-gray-600 leading-relaxed">
+              Engineered for speed and simplicity, it requires no registration, no emails, and no passwords. 
+              Just a secure room ID is all you need to start syncing in real-time.
+            </p>
+          </article>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-50">
+              <h3 className="font-bold text-gray-900 mb-2">Developers</h3>
+              <p className="text-sm text-gray-500">Quickly sync API keys, logs, or snippets between dev environments and testing devices.</p>
+            </div>
+            <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-50">
+              <h3 className="font-bold text-gray-900 mb-2">Students</h3>
+              <p className="text-sm text-gray-500">Share research links or notes between your tablet and laptop during study sessions.</p>
+            </div>
+            <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-50">
+              <h3 className="font-bold text-gray-900 mb-2">Professionals</h3>
+              <p className="text-sm text-gray-500">Move text data instantly across multiple workstations without the friction of chat apps.</p>
+            </div>
+            <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-50">
+              <h3 className="font-bold text-gray-900 mb-2">Free Forever</h3>
+              <p className="text-sm text-gray-500">Enjoy unlimited text sharing across all your devices for free, with no hidden costs.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="w-full py-8 border-t border-gray-50 flex flex-col items-center space-y-4">
+        <p className="text-sm text-gray-400">© 2024 Realtime Clipboard. All rights reserved.</p>
+        <div className="flex space-x-6 text-xs text-indigo-400 font-medium">
+          <a href="#" className="hover:text-indigo-600 transition-colors">Privacy Policy</a>
+          <a href="#" className="hover:text-indigo-600 transition-colors">Terms of Service</a>
+          <a href="#" className="hover:text-indigo-600 transition-colors">Contact Us</a>
+        </div>
+      </footer>
     </div>
   );
 }

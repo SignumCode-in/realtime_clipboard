@@ -4,12 +4,69 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="description" content="Share text across devices instantly. A realtime clipboard web app." />
+    
+    <!-- Primary Meta Tags -->
+    <title>Realtime Clipboard – Share Text Instantly Between Devices</title>
+    <meta name="title" content="Realtime Clipboard – Share Text Instantly Between Devices" />
+    <meta name="description" content="Share text across devices instantly with Realtime Clipboard. A frictionless, no-login way to copy-paste between phone, tablet, and computer using online clipboard sync." />
+    <meta name="keywords" content="realtime clipboard, online clipboard, share text, copy paste online, clipboard sync, instant text sharing, cross-device copy paste" />
+    <meta name="author" content="Realtime Clipboard" />
+    <link rel="canonical" href="https://realtime-clipboard.com/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://realtime-clipboard.com/" />
+    <meta property="og:title" content="Realtime Clipboard – Share Text Instantly Between Devices" />
+    <meta property="og:description" content="Share text across devices instantly. A frictionless, no-login way to copy-paste between phone, tablet, and computer." />
+    <meta property="og:image" content="https://realtime-clipboard.com/og-image.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://realtime-clipboard.com/" />
+    <meta property="twitter:title" content="Realtime Clipboard – Share Text Instantly Between Devices" />
+    <meta property="twitter:description" content="Share text across devices instantly. A frictionless, no-login way to copy-paste between phone, tablet, and computer." />
+    <meta property="twitter:image" content="https://realtime-clipboard.com/og-image.png" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Realtime Clipboard",
+        "url": "https://realtime-clipboard.com",
+        "description": "A real-time text sharing tool that allows users to instantly sync clipboard content across multiple devices without login.",
+        "applicationCategory": "ProductivityApplication",
+        "operatingSystem": "All",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
+
     <link rel="manifest" href="/manifest.json" />
-    <title>Realtime Clipboard</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- SEO Landing Section (Visible to crawlers before JS hydration) -->
+      <section style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;">
+        <h1>Realtime Clipboard</h1>
+        <h2>Share Text Instantly Between Devices</h2>
+        <p>
+          Realtime Clipboard is a frictionless online tool designed for instant text sharing across devices. 
+          Whether you are a developer needs to move snippets between machines, a student sharing notes, 
+          or a professional syncing data across mobile and desktop, our realtime clipboard sync ensures 
+          your data is available everywhere instantly. No login required, just create a room and start sharing.
+        </p>
+        <ul>
+          <li>Instant synchronization across all connected devices</li>
+          <li>No account or registration needed</li>
+          <li>Secure room-based sharing</li>
+          <li>Developer-friendly for quick code sharing</li>
+        </ul>
+      </section>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {

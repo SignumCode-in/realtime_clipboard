@@ -5,7 +5,24 @@ import cors from 'cors';
 import path from 'path';
 import { RoomData, SOCKET_EVENTS, MAX_TEXT_LENGTH } from '@realtime-clipboard/shared';
 
+import compression from 'compression';
+
 const app = express();
+
+// Enable compression
+app.use(compression());
+
+// HTTPS redirection (for production)
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+      next();
+    }
+  });
+}
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
