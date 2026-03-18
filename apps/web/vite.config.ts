@@ -13,6 +13,10 @@ export default defineConfig({
   server: {
     port: 3000,
     open: false,
+    proxy: {
+      '/upload': 'http://localhost:3001',
+      '/download': 'http://localhost:3001',
+    }
   },
   optimizeDeps: {
     include: ['@realtime-clipboard/shared']

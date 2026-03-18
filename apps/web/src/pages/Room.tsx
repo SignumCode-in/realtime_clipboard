@@ -1,9 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Users, Check, Share2, LogOut, Loader2, AlertCircle } from 'lucide-react';
-import { SOCKET_EVENTS, type RoomData } from '@realtime-clipboard/shared';
+import { Copy, Users, Check, Share2, LogOut, Loader2, AlertCircle, Wand2, Type, Code2, Cpu, Hash } from 'lucide-react';
+import { SOCKET_EVENTS, type RoomData, type FileMetadata } from '@realtime-clipboard/shared';
 import { socket } from '../lib/socket';
+import FileTransfer from '../components/FileTransfer';
+import Editor, { type OnMount } from '@monaco-editor/react';
+
+const SUPPORTED_LANGUAGES = [
+  { id: 'plaintext', name: 'Plain Text', icon: <Type className="w-4 h-4" /> },
+  { id: 'json', name: 'JSON', icon: <Hash className="w-4 h-4" /> },
+  { id: 'javascript', name: 'JavaScript', icon: <Code2 className="w-4 h-4" /> },
+  { id: 'typescript', name: 'TypeScript', icon: <Code2 className="w-4 h-4" /> },
+  { id: 'html', name: 'HTML', icon: <Cpu className="w-4 h-4" /> },
+  { id: 'css', name: 'CSS', icon: <Cpu className="w-4 h-4" /> },
+  { id: 'markdown', name: 'Markdown', icon: <Hash className="w-4 h-4" /> },
+];
 
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -16,15 +28,22 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [language, setLanguage] = useState('plaintext');
   
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<any>(null);
 
-  // Focus textarea implicitly when valid
+  // Auto-detect JSON
   useEffect(() => {
-    if (!loading && isConnected) {
-      textareaRef.current?.focus();
+    if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+      try {
+        JSON.parse(text);
+        if (language === 'plaintext') setLanguage('json');
+      } catch (e) {
+        // Not valid JSON
+      }
     }
-  }, [loading, isConnected]);
+  }, [text, language]);
 
   // Handle Socket connections
   useEffect(() => {
@@ -53,9 +72,7 @@ export default function Room() {
     };
 
     const onRoomData = (data: RoomData) => {
-      setRoomData({ ...data }); // to trigger render fresh
-      // Only set text if it's the initial connect load to avoid overwriting ongoing typing if desync,
-      // but simpler approach: just set it since it's initial load
+      setRoomData({ ...data }); 
       if (loading) {
         setText(data.text);
         setLoading(false);
@@ -63,7 +80,18 @@ export default function Room() {
     };
 
     const onTextUpdate = ({ text: newText }: { text: string }) => {
-      setText(newText);
+      // If we are currently focused on editor, we need to be careful with cursors
+      // Monaco handles this better if we only update when necessary
+      if (newText !== text) {
+        setText(newText);
+      }
+    };
+
+    const onFileAvailable = (file: FileMetadata) => {
+      setFiles((prev) => {
+        if (prev.find(f => f.fileId === file.fileId)) return prev;
+        return [...prev, file];
+      });
     };
 
     socket.on('connect', onConnect);
@@ -71,8 +99,8 @@ export default function Room() {
     socket.on(SOCKET_EVENTS.ERROR, onError);
     socket.on(SOCKET_EVENTS.ROOM_DATA, onRoomData);
     socket.on(SOCKET_EVENTS.TEXT_UPDATE, onTextUpdate);
+    socket.on(SOCKET_EVENTS.FILE_AVAILABLE, onFileAvailable);
 
-    // Initial check (in case it connects immediately)
     if (socket.connected) {
       onConnect();
     }
@@ -83,25 +111,25 @@ export default function Room() {
       socket.off(SOCKET_EVENTS.ERROR, onError);
       socket.off(SOCKET_EVENTS.ROOM_DATA, onRoomData);
       socket.off(SOCKET_EVENTS.TEXT_UPDATE, onTextUpdate);
+      socket.off(SOCKET_EVENTS.FILE_AVAILABLE, onFileAvailable);
       socket.disconnect();
     };
-  }, [roomId, navigate]);
+  }, [roomId, navigate, loading, text]);
 
   // Debounced emit
   const emitUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
+  const handleEditorChange = (value: string | undefined) => {
+    const val = value || '';
     setText(val);
     
-    // Optimistic cache for offline reloading (basic PWA requirement)
     localStorage.setItem(`clipboard_${roomId}`, val);
 
     if (emitUpdateRef.current) clearTimeout(emitUpdateRef.current);
     
     emitUpdateRef.current = setTimeout(() => {
       socket.emit(SOCKET_EVENTS.TEXT_UPDATE, { roomId, text: val });
-    }, 200); // 200ms debounce
+    }, 200);
   };
 
   const handleCopy = async () => {
@@ -114,16 +142,17 @@ export default function Room() {
     }
   };
 
-  const handlePaste = async () => {
-    try {
-      const clipboardText = await navigator.clipboard.readText();
-      const newText = text ? text + '\n' + clipboardText : clipboardText;
-      setText(newText);
-      socket.emit(SOCKET_EVENTS.TEXT_UPDATE, { roomId, text: newText });
-    } catch (err) {
-      console.error('Failed to read clipboard', err);
+  const handleFormat = async () => {
+    if (editorRef.current) {
+      editorRef.current.getAction('editor.action.formatDocument').run();
     }
   };
+
+  const handleEditorDidMount: OnMount = (editor) => {
+    editorRef.current = editor;
+  };
+
+  const handleFileUploadSuccess = () => {};
 
   if (errorMsg) {
     return (
@@ -195,47 +224,103 @@ export default function Room() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col p-4 md:p-8 max-w-6xl mx-auto w-full relative">
-        <div className="flex-1 relative flex flex-col shadow-xl shadow-gray-200/50 rounded-2xl bg-white border border-gray-100 overflow-hidden">
+      <main className="flex-1 flex flex-col lg:flex-row p-4 md:p-8 max-w-7xl mx-auto w-full gap-8">
+        
+        {/* Left: Editor Area */}
+        <div className="flex-1 flex flex-col shadow-xl shadow-gray-200/50 rounded-2xl bg-white border border-gray-100 overflow-hidden min-h-[500px]">
           
-          <div className="absolute top-4 right-4 flex space-x-2 z-10">
-            {/* Native Paste fallback if preferred, but manual button is nice */}
-            <button
-              onClick={handlePaste}
-              className="px-4 py-2 bg-white/80 backdrop-blur border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium flex items-center space-x-2"
-            >
-              <span>Paste</span>
-            </button>
-            <button
-              onClick={handleCopy}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all shadow-sm text-sm font-medium flex items-center space-x-2 w-28 justify-center"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span>Copy All</span>
-                </>
-              )}
-            </button>
+          {/* Editor Toolbar */}
+          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center space-x-2">
+              <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-sm">
+                {SUPPORTED_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.id}
+                    onClick={() => setLanguage(lang.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                      language === lang.id 
+                        ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-200' 
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    {lang.icon}
+                    <span className="hidden xl:inline">{lang.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleFormat}
+                className="flex items-center space-x-1.5 bg-white border border-gray-200 text-gray-700 hover:text-indigo-600 hover:border-indigo-200 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>Format Code</span>
+              </button>
+              
+              <button
+                onClick={handleCopy}
+                className={`flex items-center space-x-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ring-1 ${
+                  copied 
+                    ? 'bg-green-50 text-green-600 ring-green-200 animate-in zoom-in-95' 
+                    : 'bg-indigo-600 text-white ring-indigo-500 hover:bg-indigo-700'
+                }`}
+              >
+                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied!' : 'Copy All'}</span>
+              </button>
+            </div>
           </div>
 
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={handleChange}
-            placeholder="Type or paste something here... It will instantly appear on all connected devices."
-            className="flex-1 w-full bg-transparent resize-none p-6 pt-16 md:p-8 md:pt-20 text-lg md:text-xl text-gray-800 placeholder-gray-300 focus:outline-none leading-relaxed font-mono"
-            spellCheck="false"
-          />
+          <div className="flex-1 h-full w-full bg-white relative">
+            <Editor
+              height="100%"
+              language={language}
+              value={text}
+              theme="light"
+              options={{
+                fontSize: 14,
+                fontFamily: "'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', 'Courier New', monospace",
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                glyphMargin: false,
+                folding: true,
+                matchBrackets: 'always',
+                automaticLayout: true,
+                padding: { top: 20, bottom: 20 },
+                lineHeight: 1.6,
+                letterSpacing: 0,
+                cursorSmoothCaretAnimation: 'on',
+                smoothScrolling: true,
+              }}
+              onChange={handleEditorChange}
+              onMount={handleEditorDidMount}
+              loading={<div className="flex items-center justify-center h-full text-gray-400">Loading editor...</div>}
+            />
+          </div>
+          
+          <div className="bg-gray-50 border-t border-gray-200 px-6 py-2 flex justify-between items-center">
+            <p className="text-[10px] text-gray-400 font-medium">
+              Synced in realtime • Monaco Engine
+            </p>
+            <p className="text-[10px] text-indigo-400 font-mono">
+              {text.length} chars
+            </p>
+          </div>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-4">
-          All changes are synchronized in realtime. Content is stored in memory and may be cleared.
-        </p>
+
+        {/* Right: File Transfer */}
+        <div className="w-full lg:w-80 shrink-0">
+          <div className="sticky top-24">
+            <FileTransfer 
+              roomId={roomId!} 
+              files={files} 
+              onUploadSuccess={handleFileUploadSuccess} 
+            />
+          </div>
+        </div>
       </main>
 
       {/* Share Modal */}

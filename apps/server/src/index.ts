@@ -3,8 +3,10 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
-import { RoomData, SOCKET_EVENTS, MAX_TEXT_LENGTH } from '@realtime-clipboard/shared';
-
+import fs from 'fs';
+import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
+import { RoomData, SOCKET_EVENTS, MAX_TEXT_LENGTH, FileMetadata, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from '@realtime-clipboard/shared';
 import compression from 'compression';
 
 const app = express();
@@ -34,6 +36,114 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Ephemeral File Sharing Setup
+const TEMP_DIR = path.join(__dirname, '../temp');
+if (fs.existsSync(TEMP_DIR)) {
+  // Clear any old files on startup
+  fs.readdirSync(TEMP_DIR).forEach(file => {
+    fs.unlinkSync(path.join(TEMP_DIR, file));
+  });
+} else {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
+
+// In-memory file storage: fileId -> FileMetadata & local path
+interface ExtendedFileMetadata extends FileMetadata {
+  localPath: string;
+  roomId: string;
+}
+const ephemeralFiles = new Map<string, ExtendedFileMetadata>();
+
+// Multer configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, TEMP_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${uuidv4()}-${file.originalname}`;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_FILE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type: ${file.mimetype}`));
+    }
+  }
+});
+
+// File upload endpoint
+app.post('/upload', upload.single('file'), (req, res) => {
+  const file = req.file;
+  const roomId = req.body.roomId;
+
+  if (!file || !roomId) {
+    return res.status(400).json({ message: 'Missing file or roomId' });
+  }
+
+  const fileId = uuidv4();
+  // Using relative URL or absolute? Let's use relative for flexibility
+  const downloadUrl = `/download/${fileId}`;
+
+  const metadata: ExtendedFileMetadata = {
+    fileId,
+    fileName: file.originalname,
+    fileSize: file.size,
+    fileType: file.mimetype,
+    uploadedAt: new Date().toISOString(),
+    downloadUrl,
+    localPath: file.path,
+    roomId
+  };
+
+  ephemeralFiles.set(fileId, metadata);
+
+  // Emit to the room
+  io.to(roomId).emit(SOCKET_EVENTS.FILE_AVAILABLE, metadata);
+
+  // Auto-delete after 5 minutes (300,000 ms)
+  setTimeout(() => {
+    deleteFile(fileId);
+  }, 5 * 60 * 1000);
+
+  res.status(200).json(metadata);
+});
+
+// File download endpoint
+app.get('/download/:fileId', (req, res) => {
+  const { fileId } = req.params;
+  const fileData = ephemeralFiles.get(fileId);
+
+  if (!fileData || !fs.existsSync(fileData.localPath)) {
+    return res.status(404).json({ message: 'File not found or expired' });
+  }
+
+  res.download(fileData.localPath, fileData.fileName, (err) => {
+    if (err) {
+      console.error('Download error:', err);
+    } else {
+      // Optional: Delete after download
+      // deleteFile(fileId);
+    }
+  });
+});
+
+function deleteFile(fileId: string) {
+  const fileData = ephemeralFiles.get(fileId);
+  if (fileData) {
+    if (fs.existsSync(fileData.localPath)) {
+      fs.unlinkSync(fileData.localPath);
+    }
+    ephemeralFiles.delete(fileId);
+    console.log(`Deleted expired/downloaded file: ${fileId}`);
+  }
+}
 
 // Serve static frontend in production
 if (process.env.NODE_ENV === 'production') {
@@ -80,6 +190,14 @@ io.on('connection', (socket) => {
     // Broadcast updated room data (like user count) and initial text to the newly joined user
     socket.emit(SOCKET_EVENTS.ROOM_DATA, room); // send to self
     socket.to(roomId).emit(SOCKET_EVENTS.ROOM_DATA, room); // broadcast to others
+    
+    // Send existing files in the room to the newly joined user
+    const existingFiles = Array.from(ephemeralFiles.values())
+      .filter(f => f.roomId === roomId);
+    
+    existingFiles.forEach(file => {
+      socket.emit(SOCKET_EVENTS.FILE_AVAILABLE, file);
+    });
   });
 
   socket.on(SOCKET_EVENTS.TEXT_UPDATE, ({ roomId, text }) => {
