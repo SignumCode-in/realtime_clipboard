@@ -65,6 +65,7 @@ export default function Room() {
     };
 
     const onError = (err: any) => {
+      console.error('Socket error:', err);
       setErrorMsg(err.message || 'An error occurred');
       if (err.message === 'Invalid room ID') {
         setTimeout(() => navigate('/'), 2000);
@@ -73,18 +74,17 @@ export default function Room() {
 
     const onRoomData = (data: RoomData) => {
       setRoomData({ ...data }); 
-      if (loading) {
-        setText(data.text);
-        setLoading(false);
-      }
+      setLoading(false);
+      setText(data.text);
     };
 
     const onTextUpdate = ({ text: newText }: { text: string }) => {
-      // If we are currently focused on editor, we need to be careful with cursors
-      // Monaco handles this better if we only update when necessary
-      if (newText !== text) {
-        setText(newText);
-      }
+      setText(prevText => {
+        if (newText !== prevText) {
+          return newText;
+        }
+        return prevText;
+      });
     };
 
     const onFileAvailable = (file: FileMetadata) => {
@@ -114,7 +114,7 @@ export default function Room() {
       socket.off(SOCKET_EVENTS.FILE_AVAILABLE, onFileAvailable);
       socket.disconnect();
     };
-  }, [roomId, navigate, loading, text]);
+  }, [roomId, navigate]);
 
   // Debounced emit
   const emitUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
