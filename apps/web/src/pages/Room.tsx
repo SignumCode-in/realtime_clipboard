@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Users, Check, Share2, LogOut, Loader2, AlertCircle, Wand2, Type, Code2, Cpu, Hash, X } from 'lucide-react';
+import { Copy, Users, Check, Share2, LogOut, Loader2, AlertCircle, Type, Code2, Cpu, Hash, X } from 'lucide-react';
 import { SOCKET_EVENTS, type RoomData, type FileMetadata } from '@realtime-clipboard/shared';
 import { socket } from '../lib/socket';
+import { cn } from '../lib/utils';
 import FileTransfer from '../components/FileTransfer';
 import Editor, { type OnMount } from '@monaco-editor/react';
 
@@ -32,6 +33,13 @@ export default function Room() {
   const [language, setLanguage] = useState('plaintext');
 
   const editorRef = useRef<any>(null);
+  const [userId] = useState(() => {
+    const saved = localStorage.getItem('clipboard_user_id');
+    if (saved) return saved;
+    const newId = Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('clipboard_user_id', newId);
+    return newId;
+  });
 
   // Auto-detect JSON
   useEffect(() => {
@@ -52,8 +60,6 @@ export default function Room() {
       return;
     }
 
-    socket.connect();
-
     const onConnect = () => {
       setIsConnected(true);
       setErrorMsg('');
@@ -64,22 +70,19 @@ export default function Room() {
       setIsConnected(false);
     };
 
-    const onError = (err: any) => {
-      console.error('Socket error:', err);
-      setErrorMsg(err.message || 'An error occurred');
-      if (err.message === 'Invalid room ID') {
-        setTimeout(() => navigate('/'), 2000);
-      }
+    const onError = ({ message }: { message: string }) => {
+      setErrorMsg(message);
+      setLoading(false);
     };
 
     const onRoomData = (data: RoomData) => {
-      setRoomData({ ...data });
-      setLoading(false);
+      setRoomData(data);
       setText(data.text);
+      setLoading(false);
     };
 
     const onTextUpdate = ({ text: newText }: { text: string }) => {
-      setText(prevText => {
+      setText((prevText) => {
         if (newText !== prevText) {
           return newText;
         }
@@ -94,16 +97,25 @@ export default function Room() {
       });
     };
 
+    const onFileDeleted = ({ fileId }: { fileId: string }) => {
+      setFiles((prev) => prev.filter(f => f.fileId !== fileId));
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on(SOCKET_EVENTS.ERROR, onError);
     socket.on(SOCKET_EVENTS.ROOM_DATA, onRoomData);
     socket.on(SOCKET_EVENTS.TEXT_UPDATE, onTextUpdate);
     socket.on(SOCKET_EVENTS.FILE_AVAILABLE, onFileAvailable);
+    socket.on(SOCKET_EVENTS.FILE_DELETED, onFileDeleted);
 
     if (socket.connected) {
       onConnect();
     }
+
+    // Update document title for SEO and better UX
+    const originalTitle = document.title;
+    document.title = `Room: ${roomId} - Realtime Clipboard`;
 
     return () => {
       socket.off('connect', onConnect);
@@ -112,7 +124,8 @@ export default function Room() {
       socket.off(SOCKET_EVENTS.ROOM_DATA, onRoomData);
       socket.off(SOCKET_EVENTS.TEXT_UPDATE, onTextUpdate);
       socket.off(SOCKET_EVENTS.FILE_AVAILABLE, onFileAvailable);
-      socket.disconnect();
+      socket.off(SOCKET_EVENTS.FILE_DELETED, onFileDeleted);
+      document.title = originalTitle;
     };
   }, [roomId, navigate]);
 
@@ -129,196 +142,189 @@ export default function Room() {
 
     emitUpdateRef.current = setTimeout(() => {
       socket.emit(SOCKET_EVENTS.TEXT_UPDATE, { roomId, text: val });
-    }, 200);
-  };
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy', err);
-    }
-  };
-
-  const handleFormat = async () => {
-    if (editorRef.current) {
-      editorRef.current.getAction('editor.action.formatDocument').run();
-    }
+    }, 500);
   };
 
   const handleEditorDidMount: OnMount = (editor) => {
     editorRef.current = editor;
   };
 
-  const handleFileUploadSuccess = () => { };
+  const copyRoomId = () => {
+    if (!roomId) return;
+    navigator.clipboard.writeText(roomId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleFileUploadSuccess = (file: FileMetadata) => {
+    setFiles((prev) => [...prev, file]);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-indigo-100/50 flex flex-col items-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-500">
+          <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
+            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Connecting to Room</h2>
+          <p className="text-gray-500 text-center text-sm">Preparing your encrypted clipboard session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (errorMsg) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans p-4">
-        <div className="bg-red-50 text-red-600 p-6 rounded-xl flex items-center space-x-3 shadow-sm border border-red-100 max-w-md w-full">
-          <AlertCircle className="w-6 h-6 shrink-0" />
-          <span className="font-medium">{errorMsg}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading || !isConnected) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center space-y-4 p-4 text-center">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-        <span className="text-gray-500 font-medium tracking-wide animate-pulse">
-          Connecting to room...
-        </span>
-      </div>
-    );
-  }
-
-  const roomUrl = window.location.href;
-
-  return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col font-sans">
-
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200/80 px-4 py-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-indigo-50/50">
-        <div className="flex items-center space-x-3">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-3xl shadow-xl shadow-red-100/50 flex flex-col items-center max-w-sm w-full animate-in fade-in zoom-in-95 duration-500">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-6">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Room Error</h2>
+          <p className="text-red-500 text-center text-sm mb-6">{errorMsg}</p>
           <button
             onClick={() => navigate('/')}
-            className="p-2 text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Leave room"
+            className="w-full py-3 px-6 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-all active:scale-[0.98]"
           >
-            <LogOut className="w-5 h-5 md:w-5 md:h-5" />
+            Back to Home
           </button>
-          <div>
-            <h1 className="text-lg md:text-xl font-bold tracking-tight text-gray-900 flex items-center space-x-1.5 md:space-x-2">
-              <span className="hidden xs:inline">Room:</span>
-              <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-mono text-sm md:text-base">{roomId}</span>
-            </h1>
-          </div>
         </div>
+      </div>
+    );
+  }
 
-        <div className="flex items-center space-x-2 md:space-x-3">
-          <div className="flex items-center space-x-1.5 bg-green-50 text-green-700 px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-full text-xs md:sm font-medium border border-green-200">
-            <span className="relative flex w-2 h-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full w-2 h-2 bg-green-500"></span>
-            </span>
-            <span className="hidden sm:inline">Connected</span>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 h-16 md:h-20 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200 rotate-3">
+              <Share2 className="w-5 h-5 text-white" />
+            </div>
+            <div className="hidden xs:block">
+              <h1 className="text-lg font-bold text-gray-900 leading-none">Realtime</h1>
+              <p className="text-[10px] font-medium text-indigo-600 tracking-wider uppercase mt-0.5">Clipboard</p>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-1 border border-gray-200 bg-white text-gray-700 px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-full text-xs md:sm font-medium">
-            <Users className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span>{roomData?.users || 1}</span>
-          </div>
+          <div className="flex items-center gap-2 md:gap-4 flex-1 justify-end">
+            <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 overflow-hidden max-w-[140px] xs:max-w-none">
+              <code className="text-sm font-mono font-medium text-gray-600 px-2 truncate">
+                {roomId}
+              </code>
+              <button
+                onClick={copyRoomId}
+                className={cn(
+                  "p-2 rounded-lg transition-all active:scale-95",
+                  copied ? "bg-green-500 text-white" : "bg-white text-gray-400 hover:text-gray-600 shadow-sm border border-gray-100"
+                )}
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
 
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 md:px-4 md:py-1.5 rounded-full text-xs md:sm font-medium transition-colors shadow-sm shadow-indigo-100"
-          >
-            <Share2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="hidden xs:inline sm:inline">Share</span>
-          </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all active:scale-95"
+                title="Share room"
+              >
+                <Share2 className="w-5 h-5" />
+              </button>
+              <div className="h-8 w-[1px] bg-gray-100 mx-1 hidden md:block" />
+              <button
+                onClick={() => navigate('/')}
+                className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all active:scale-95"
+                title="Leave room"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col lg:flex-row p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full gap-6 lg:gap-8 overflow-x-hidden">
-
+      <main className="max-w-7xl mx-auto px-4 py-6 md:py-8 flex flex-col lg:flex-row gap-8">
         {/* Left: Editor Area */}
-        <div className="flex-1 flex flex-col shadow-xl shadow-gray-200/40 rounded-2xl bg-white border border-gray-100 overflow-hidden min-h-[400px] lg:min-h-0">
+        <div className="flex-1 min-w-0 flex flex-col space-y-4">
+          {/* Header Controls */}
+          <div className="flex items-center justify-between overflow-x-auto no-scrollbar pb-1">
+            <div className="flex items-center gap-2 p-1 bg-white rounded-xl border border-gray-100 shadow-sm shrink-0">
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.id}
+                  onClick={() => setLanguage(lang.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0",
+                    language === lang.id
+                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-100"
+                      : "text-gray-500 hover:bg-gray-50"
+                  )}
+                >
+                  {lang.icon}
+                  <span className="hidden sm:inline">{lang.name}</span>
+                </button>
+              ))}
+            </div>
 
-          {/* Editor Toolbar */}
-          <div className="bg-gray-50 border-b border-gray-200 px-3 md:px-4 py-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-            <div className="flex items-center overflow-x-auto no-scrollbar px-1 sm:px-0">
-              <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-sm min-w-max">
-                {SUPPORTED_LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.id}
-                    onClick={() => setLanguage(lang.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] md:text-xs font-semibold transition-all whitespace-nowrap ${language === lang.id
-                      ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-200'
-                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                      }`}
-                  >
-                    {lang.icon}
-                    <span className="hidden xs:inline">{lang.name}</span>
-                  </button>
-                ))}
+            <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg shrink-0">
+                <Users className="w-3.5 h-3.5" />
+                <span className="text-xs font-bold font-mono">{roomData?.users || 0}</span>
               </div>
-            </div>
-
-            <div className="flex items-center space-x-2 w-full sm:w-auto">
-              <button
-                onClick={handleFormat}
-                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 bg-white border border-gray-200 text-gray-700 hover:text-indigo-600 hover:border-indigo-200 px-3 md:px-4 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-all shadow-sm hover:shadow"
-              >
-                <Wand2 className="w-3.5 h-3.5 shrink-0" />
-                <span>Format Code</span>
-              </button>
-
-              <button
-                onClick={handleCopy}
-                className={`flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-3 md:px-4 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-all shadow-sm ring-1 ${copied
-                  ? 'bg-green-50 text-green-600 ring-green-200 animate-in zoom-in-95'
-                  : 'bg-indigo-600 text-white ring-indigo-500 hover:bg-indigo-700'
-                  }`}
-              >
-                {copied ? <Check className="w-3.5 h-3.5 shrink-0" /> : <Copy className="w-3.5 h-3.5 shrink-0" />}
-                <span>{copied ? 'Copied!' : 'Copy All'}</span>
-              </button>
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+              )} />
             </div>
           </div>
 
-          <div className="w-full bg-white relative h-[450px] lg:h-auto lg:flex-1 flex flex-col">
-            <Editor
-              height="100%"
-              width="100%"
-              language={language}
-              value={text}
-              theme="light"
-              options={{
-                fontSize: 14,
-                fontFamily: "'JetBrains Mono', 'Fira Code', 'Menlo', 'Monaco', 'Courier New', monospace",
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                lineNumbers: 'on',
-                glyphMargin: false,
-                folding: true,
-                matchBrackets: 'always',
-                automaticLayout: true,
-                wordWrap: 'on',
-                padding: { top: 20, bottom: 20 },
-                lineHeight: 1.6,
-                letterSpacing: 0,
-                cursorSmoothCaretAnimation: 'on',
-                smoothScrolling: true,
-                renderLineHighlight: 'none',
-                scrollbar: {
-                  vertical: 'visible',
-                  horizontal: 'visible',
-                  useShadows: false,
-                  verticalScrollbarSize: 10,
-                  horizontalScrollbarSize: 10,
-                },
-                fixedOverflowWidgets: true,
-                quickSuggestions: false,
-                links: false,
-              }}
-              onChange={handleEditorChange}
-              onMount={handleEditorDidMount}
-              loading={<div className="flex items-center justify-center h-full text-gray-400">Loading editor...</div>}
-            />
-          </div>
+          {/* Editor Container */}
+          <div className="relative flex-1 bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden min-h-[450px]">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 z-10 opacity-50" />
+            
+            <div className="h-full pt-4">
+              <Editor
+                height="450px"
+                language={language}
+                value={text}
+                theme="vs-light"
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  roundedSelection: true,
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  padding: { top: 16, bottom: 16 },
+                  wordWrap: 'on',
+                  cursorStyle: 'line',
+                  fontFamily: "'JetBrains Mono', 'Fira Code', 'Menlo', monospace",
+                  scrollbar: {
+                    vertical: 'visible',
+                    horizontal: 'visible',
+                    useShadows: false,
+                    verticalScrollbarSize: 10,
+                    horizontalScrollbarSize: 10,
+                  }
+                }}
+                onChange={handleEditorChange}
+                onMount={handleEditorDidMount}
+                loading={<div className="flex items-center justify-center h-full text-gray-400">Loading editor...</div>}
+              />
+            </div>
 
-          <div className="bg-gray-50 border-t border-gray-200 px-6 py-2 flex justify-between items-center">
-            <p className="text-[10px] text-gray-400 font-medium">
-              Synced in realtime • Monaco Engine
-            </p>
-            <p className="text-[10px] text-indigo-400 font-mono">
-              {text.length} chars
-            </p>
+            {/* Editor Footer */}
+            <div className="bg-gray-50 border-t border-gray-200 px-6 py-2 flex justify-between items-center">
+              <p className="text-[10px] text-gray-400 font-medium">
+                Synced in realtime • Monaco Engine
+              </p>
+              <p className="text-[10px] text-indigo-400 font-mono">
+                {text.length} chars
+              </p>
+            </div>
           </div>
         </div>
 
@@ -327,6 +333,7 @@ export default function Room() {
           <div className="sticky top-24">
             <FileTransfer
               roomId={roomId!}
+              userId={userId}
               files={files}
               onUploadSuccess={handleFileUploadSuccess}
             />
@@ -345,44 +352,30 @@ export default function Room() {
               <X className="w-4 h-4" />
             </button>
 
-            <div className="text-center mb-6">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Share Room</h2>
-              <p className="text-gray-500 text-xs md:sm">Scan QR code or share the link</p>
-            </div>
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
+                <Share2 className="w-8 h-8 text-indigo-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Share Room</h3>
+              <p className="text-gray-500 text-center text-sm mb-8">Scan this code to quickly join the room from another device.</p>
+              
+              <div className="p-6 bg-white border-2 border-gray-50 rounded-3xl mb-8 shadow-sm">
+                <QRCodeSVG value={window.location.href} size={200} />
+              </div>
 
-            <div className="bg-gray-50 p-4 md:p-6 rounded-2xl flex justify-center items-center mb-6 border border-gray-100">
-              <QRCodeSVG
-                value={roomUrl}
-                size={window.innerWidth < 420 ? 160 : 200}
-                level="H"
-                includeMargin={false}
-                className="bg-white p-2 rounded-xl shadow-sm"
-              />
-            </div>
-
-            <div className="flex flex-col space-y-3">
-              <div className="flex text-xs md:text-sm">
-                <input
-                  type="text"
-                  readOnly
-                  value={roomUrl}
-                  className="flex-1 bg-gray-50 border border-gray-200 rounded-l-lg px-3 py-2 text-gray-600 focus:outline-none overflow-hidden text-ellipsis"
-                />
+              <div className="w-full flex gap-3">
                 <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(roomUrl);
-                    alert('Link copied!');
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 md:px-4 py-2 rounded-r-lg font-medium transition-colors whitespace-nowrap"
+                  onClick={copyRoomId}
+                  className="flex-1 py-3 px-4 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                  Copy
+                  <Copy className="w-4 h-4" />
+                  Copy Link
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

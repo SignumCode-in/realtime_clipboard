@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CopyPlus, ArrowRight, Laptop2, Globe2, Zap } from 'lucide-react';
 
 export default function Home() {
   const [joinId, setJoinId] = useState('');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = 'Realtime Clipboard – Share Text Instantly Between Devices';
+  }, []);
 
   const handleCreateRoom = () => {
     // Generate a random 6-character alphanumeric room ID

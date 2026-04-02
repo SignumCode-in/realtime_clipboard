@@ -1,21 +1,17 @@
 import React, { useState, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { Upload, File as FileIcon, X, Download, Loader2, Paperclip, Clock, ShieldCheck } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { Upload, File as FileIcon, X, Download, Loader2, Paperclip, Clock, ShieldCheck, Trash2 } from 'lucide-react';
 import { type FileMetadata, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from '@realtime-clipboard/shared';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../lib/utils';
 
 interface FileTransferProps {
   roomId: string;
+  userId: string;
   files: FileMetadata[];
   onUploadSuccess: (file: FileMetadata) => void;
 }
 
-export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTransferProps) {
+export default function FileTransfer({ roomId, userId, files, onUploadSuccess }: FileTransferProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +52,7 @@ export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTra
     const formData = new FormData();
     formData.append('file', file);
     formData.append('roomId', roomId);
+    formData.append('ownerId', userId);
 
     try {
       const response = await axios.post<FileMetadata>('/upload', formData, {
@@ -98,6 +95,14 @@ export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTra
     const file = e.target.files?.[0];
     if (file) {
       handleUpload(file);
+    }
+  };
+
+  const handleDelete = async (fileId: string) => {
+    try {
+      await axios.post(`/delete/${fileId}`, { ownerId: userId });
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Delete failed');
     }
   };
 
@@ -208,14 +213,25 @@ export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTra
                 </div>
               </div>
 
-              <a
-                href={file.downloadUrl}
-                download={file.fileName}
-                className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shrink-0"
-                title="Download"
-              >
-                <Download className="w-4 h-4" />
-              </a>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={file.downloadUrl}
+                  download={file.fileName}
+                  className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all"
+                  title="Download"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+                {file.ownerId === userId && (
+                  <button
+                    onClick={() => handleDelete(file.fileId)}
+                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
