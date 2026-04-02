@@ -19,7 +19,25 @@ export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTra
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update 'now' every second for the countdown
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getRemainingTime = useCallback((uploadedAt: string) => {
+    const expiryTime = new Date(uploadedAt).getTime() + 5 * 60 * 1000;
+    const diff = expiryTime - now;
+
+    if (diff <= 0) return 'Expired';
+
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }, [now]);
 
   const handleUpload = useCallback(async (file: File) => {
     if (file.size > MAX_FILE_SIZE) {
@@ -91,9 +109,9 @@ export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTra
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const activeFiles = files.slice().sort((a, b) =>
-    new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-  );
+  const activeFiles = files
+    .filter((f) => (new Date(f.uploadedAt).getTime() + 5 * 60 * 1000) > now)
+    .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
 
   return (
     <div className="w-full space-y-4">
@@ -141,12 +159,12 @@ export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTra
           </div>
         ) : (
           <>
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-full group-hover:scale-110 transition-transform">
-              <Upload className="w-5 h-5" />
+            <div className="p-2.5 md:p-3 bg-indigo-50 text-indigo-600 rounded-full group-hover:scale-110 transition-transform">
+              <Upload className="w-4 h-4 md:w-5 md:h-5" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-700">Click or drag file to share</p>
-              <p className="text-xs text-gray-400 mt-1">Images, PDF, Text, ZIP (max 50MB)</p>
+              <p className="text-sm font-medium text-gray-700">Click or drag to share</p>
+              <p className="text-[10px] md:text-xs text-gray-400 mt-1 px-2">Images, PDF, Text, ZIP (max 50MB)</p>
             </div>
           </>
         )}
@@ -172,12 +190,21 @@ export default function FileTransfer({ roomId, files, onUploadSuccess }: FileTra
                   <FileIcon className="w-4 h-4" />
                 </div>
                 <div className="flex flex-col overflow-hidden">
-                  <span className="text-sm font-medium text-gray-700 truncate max-w-[150px] md:max-w-[200px]">
+                  <span className="text-sm font-medium text-gray-700 truncate max-w-[120px] xs:max-w-[150px] md:max-w-[200px]">
                     {file.fileName}
                   </span>
-                  <span className="text-[10px] text-gray-400">
-                    {formatFileSize(file.fileSize)} • {new Date(file.uploadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-gray-400">
+                      {formatFileSize(file.fileSize)}
+                    </span>
+                    <span className="text-[10px] text-gray-300">•</span>
+                    <span className={cn(
+                      "text-[10px] font-mono font-medium",
+                      getRemainingTime(file.uploadedAt) === 'Expired' ? "text-red-400" : "text-indigo-400"
+                    )}>
+                      {getRemainingTime(file.uploadedAt)}
+                    </span>
+                  </div>
                 </div>
               </div>
 

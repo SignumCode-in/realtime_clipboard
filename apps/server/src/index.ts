@@ -98,6 +98,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
     fileType: file.mimetype,
     uploadedAt: new Date().toISOString(),
     downloadUrl,
+    ownerId: req.body.ownerId || 'anonymous',
     localPath: file.path,
     roomId
   };
@@ -127,21 +128,45 @@ app.get('/download/:fileId', (req, res) => {
   res.download(fileData.localPath, fileData.fileName, (err) => {
     if (err) {
       console.error('Download error:', err);
-    } else {
-      // Optional: Delete after download
-      // deleteFile(fileId);
     }
   });
+});
+
+// File deletion endpoint (owner only)
+app.post('/delete/:fileId', (req, res) => {
+  const { fileId } = req.params;
+  const { ownerId } = req.body;
+  const fileData = ephemeralFiles.get(fileId);
+
+  if (!fileData) {
+    return res.status(404).json({ message: 'File not found' });
+  }
+
+  if (fileData.ownerId !== ownerId) {
+    return res.status(403).json({ message: 'Unauthorized to delete this file' });
+  }
+
+  const roomId = fileData.roomId;
+  deleteFile(fileId);
+
+  // Broadcast deletion to others in the room
+  io.to(roomId).emit(SOCKET_EVENTS.FILE_DELETED, { fileId });
+
+  res.status(200).json({ message: 'File deleted successfully' });
 });
 
 function deleteFile(fileId: string) {
   const fileData = ephemeralFiles.get(fileId);
   if (fileData) {
     if (fs.existsSync(fileData.localPath)) {
-      fs.unlinkSync(fileData.localPath);
+      try {
+        fs.unlinkSync(fileData.localPath);
+      } catch (e) {
+        console.error('Error deleting file:', e);
+      }
     }
     ephemeralFiles.delete(fileId);
-    console.log(`Deleted expired/downloaded file: ${fileId}`);
+    console.log(`Deleted file: ${fileId}`);
   }
 }
 
@@ -159,7 +184,7 @@ const rooms = new Map<string, RoomData>();
 
 io.on('connection', (socket) => {
   let currentRoom: string | null = null;
-  
+
   socket.on(SOCKET_EVENTS.JOIN_ROOM, ({ roomId }) => {
     if (!roomId || typeof roomId !== 'string' || roomId.length > 50) {
       socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid room ID' });
@@ -169,7 +194,7 @@ io.on('connection', (socket) => {
     // Leave previous room if any
     if (currentRoom) {
       socket.leave(currentRoom);
-      
+
       const prevRoom = rooms.get(currentRoom);
       if (prevRoom) {
         prevRoom.users = Math.max(0, prevRoom.users - 1);
@@ -183,18 +208,18 @@ io.on('connection', (socket) => {
     if (!rooms.has(roomId)) {
       rooms.set(roomId, { text: '', users: 0 });
     }
-    
+
     const room = rooms.get(roomId)!;
     room.users += 1;
-    
+
     // Broadcast updated room data (like user count) and initial text to the newly joined user
     socket.emit(SOCKET_EVENTS.ROOM_DATA, room); // send to self
     socket.to(roomId).emit(SOCKET_EVENTS.ROOM_DATA, room); // broadcast to others
-    
+
     // Send existing files in the room to the newly joined user
     const existingFiles = Array.from(ephemeralFiles.values())
       .filter(f => f.roomId === roomId);
-    
+
     existingFiles.forEach(file => {
       socket.emit(SOCKET_EVENTS.FILE_AVAILABLE, file);
     });
@@ -202,7 +227,7 @@ io.on('connection', (socket) => {
 
   socket.on(SOCKET_EVENTS.TEXT_UPDATE, ({ roomId, text }) => {
     if (!roomId || currentRoom !== roomId) return;
-    
+
     if (typeof text !== 'string' || text.length > MAX_TEXT_LENGTH) {
       socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid text payload length' });
       return;

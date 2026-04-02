@@ -26,17 +26,17 @@ export default function Home() {
         {/* Left column / Hero */}
         <div className="space-y-8">
           <div>
-            <div className="inline-flex items-center space-x-2 bg-indigo-100/80 text-indigo-700 px-3 py-1 rounded-full text-sm font-medium mb-6">
-              <Zap className="w-4 h-4" />
+            <div className="inline-flex items-center space-x-2 bg-indigo-100/80 text-indigo-700 px-3 py-1 rounded-full text-[11px] md:text-sm font-medium mb-4 md:mb-6">
+              <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" />
               <span>Realtime clipboard sync</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 leading-[1.1]">
+            <h1 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 leading-[1.1]">
               Realtime Clipboard
             </h1>
-            <h2 className="mt-2 text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+            <h2 className="mt-2 text-xl xs:text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
               Share Text Instantly Between Devices
             </h2>
-            <p className="mt-4 text-lg text-gray-600 max-w-md">
+            <p className="mt-4 text-base md:text-lg text-gray-600 max-w-md">
               A frictionless way to copy-paste between your phone, tablet, and computer. No login required.
             </p>
           </div>
@@ -62,13 +62,13 @@ export default function Home() {
                 value={joinId}
                 onChange={(e) => setJoinId(e.target.value)}
                 placeholder="Enter Room ID"
-                className="w-full bg-white border border-gray-200 text-gray-900 px-6 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase tracking-widest text-lg transition-shadow shadow-sm hover:shadow-md"
+                className="w-full bg-white border border-gray-200 text-gray-900 px-5 md:px-6 py-3.5 md:py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent uppercase tracking-widest text-base md:text-lg transition-shadow shadow-sm hover:shadow-md"
                 maxLength={20}
               />
               <button
                 type="submit"
                 disabled={!joinId.trim()}
-                className="absolute right-2 top-2 bottom-2 bg-gray-900 text-white px-4 rounded-lg flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="absolute right-1.5 top-1.5 bottom-1.5 bg-gray-900 text-white px-4 rounded-lg flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ArrowRight className="w-5 h-5" />
               </button>

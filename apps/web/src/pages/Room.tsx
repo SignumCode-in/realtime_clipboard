@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Users, Check, Share2, LogOut, Loader2, AlertCircle, Wand2, Type, Code2, Cpu, Hash } from 'lucide-react';
+import { Copy, Users, Check, Share2, LogOut, Loader2, AlertCircle, Wand2, Type, Code2, Cpu, Hash, X } from 'lucide-react';
 import { SOCKET_EVENTS, type RoomData, type FileMetadata } from '@realtime-clipboard/shared';
 import { socket } from '../lib/socket';
 import FileTransfer from '../components/FileTransfer';
@@ -20,7 +20,7 @@ const SUPPORTED_LANGUAGES = [
 export default function Room() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  
+
   const [text, setText] = useState('');
   const [roomData, setRoomData] = useState<RoomData | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -30,7 +30,7 @@ export default function Room() {
   const [errorMsg, setErrorMsg] = useState('');
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [language, setLanguage] = useState('plaintext');
-  
+
   const editorRef = useRef<any>(null);
 
   // Auto-detect JSON
@@ -73,7 +73,7 @@ export default function Room() {
     };
 
     const onRoomData = (data: RoomData) => {
-      setRoomData({ ...data }); 
+      setRoomData({ ...data });
       setLoading(false);
       setText(data.text);
     };
@@ -118,15 +118,15 @@ export default function Room() {
 
   // Debounced emit
   const emitUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   const handleEditorChange = (value: string | undefined) => {
     const val = value || '';
     setText(val);
-    
+
     localStorage.setItem(`clipboard_${roomId}`, val);
 
     if (emitUpdateRef.current) clearTimeout(emitUpdateRef.current);
-    
+
     emitUpdateRef.current = setTimeout(() => {
       socket.emit(SOCKET_EVENTS.TEXT_UPDATE, { roomId, text: val });
     }, 200);
@@ -152,13 +152,13 @@ export default function Room() {
     editorRef.current = editor;
   };
 
-  const handleFileUploadSuccess = () => {};
+  const handleFileUploadSuccess = () => { };
 
   if (errorMsg) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans">
-        <div className="bg-red-50 text-red-600 p-6 rounded-xl flex items-center space-x-3 shadow-sm border border-red-100">
-          <AlertCircle className="w-6 h-6" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-sans p-4">
+        <div className="bg-red-50 text-red-600 p-6 rounded-xl flex items-center space-x-3 shadow-sm border border-red-100 max-w-md w-full">
+          <AlertCircle className="w-6 h-6 shrink-0" />
           <span className="font-medium">{errorMsg}</span>
         </div>
       </div>
@@ -167,7 +167,7 @@ export default function Room() {
 
   if (loading || !isConnected) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center space-y-4">
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center space-y-4 p-4 text-center">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
         <span className="text-gray-500 font-medium tracking-wide animate-pulse">
           Connecting to room...
@@ -180,102 +180,101 @@ export default function Room() {
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col font-sans">
-      
+
       {/* Header */}
       <header className="bg-white border-b border-gray-200/80 px-4 py-4 md:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm shadow-indigo-50/50">
         <div className="flex items-center space-x-3">
-          <button 
-            onClick={() => navigate('/')} 
+          <button
+            onClick={() => navigate('/')}
             className="p-2 text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
             title="Leave room"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-5 h-5 md:w-5 md:h-5" />
           </button>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-gray-900 flex items-center space-x-2">
-              <span>Room:</span>
-              <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-mono">{roomId}</span>
+            <h1 className="text-lg md:text-xl font-bold tracking-tight text-gray-900 flex items-center space-x-1.5 md:space-x-2">
+              <span className="hidden xs:inline">Room:</span>
+              <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md font-mono text-sm md:text-base">{roomId}</span>
             </h1>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <div className="hidden sm:flex items-center space-x-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium border border-green-200">
+        <div className="flex items-center space-x-2 md:space-x-3">
+          <div className="flex items-center space-x-1.5 bg-green-50 text-green-700 px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-full text-xs md:sm font-medium border border-green-200">
             <span className="relative flex w-2 h-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full w-2 h-2 bg-green-500"></span>
             </span>
-            <span>Connected</span>
+            <span className="hidden sm:inline">Connected</span>
           </div>
-          
-          <div className="flex items-center space-x-1.5 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-full text-sm font-medium">
-            <Users className="w-4 h-4" />
+
+          <div className="flex items-center space-x-1 border border-gray-200 bg-white text-gray-700 px-2.5 py-1.5 md:px-3 md:py-1.5 rounded-full text-xs md:sm font-medium">
+            <Users className="w-3.5 h-3.5 md:w-4 md:h-4" />
             <span>{roomData?.users || 1}</span>
           </div>
 
           <button
             onClick={() => setShowShareModal(true)}
-            className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-full text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 md:px-4 md:py-1.5 rounded-full text-xs md:sm font-medium transition-colors shadow-sm shadow-indigo-100"
           >
-            <Share2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Share</span>
+            <Share2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span className="hidden xs:inline sm:inline">Share</span>
           </button>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col lg:flex-row p-4 md:p-8 max-w-7xl mx-auto w-full gap-8">
-        
+      <main className="flex-1 flex flex-col lg:flex-row p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full gap-6 lg:gap-8 overflow-x-hidden">
+
         {/* Left: Editor Area */}
-        <div className="flex-1 flex flex-col shadow-xl shadow-gray-200/50 rounded-2xl bg-white border border-gray-100 overflow-hidden min-h-[500px]">
-          
+        <div className="flex-1 flex flex-col shadow-xl shadow-gray-200/40 rounded-2xl bg-white border border-gray-100 overflow-hidden min-h-[400px] lg:min-h-0">
+
           {/* Editor Toolbar */}
-          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center space-x-2">
-              <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-sm">
+          <div className="bg-gray-50 border-b border-gray-200 px-3 md:px-4 py-2.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex items-center overflow-x-auto no-scrollbar px-1 sm:px-0">
+              <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-sm min-w-max">
                 {SUPPORTED_LANGUAGES.map((lang) => (
                   <button
                     key={lang.id}
                     onClick={() => setLanguage(lang.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                      language === lang.id 
-                        ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-200' 
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] md:text-xs font-semibold transition-all whitespace-nowrap ${language === lang.id
+                      ? 'bg-indigo-50 text-indigo-600 shadow-sm ring-1 ring-indigo-200'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
                   >
                     {lang.icon}
-                    <span className="hidden xl:inline">{lang.name}</span>
+                    <span className="hidden xs:inline">{lang.name}</span>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
               <button
                 onClick={handleFormat}
-                className="flex items-center space-x-1.5 bg-white border border-gray-200 text-gray-700 hover:text-indigo-600 hover:border-indigo-200 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 bg-white border border-gray-200 text-gray-700 hover:text-indigo-600 hover:border-indigo-200 px-3 md:px-4 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-all shadow-sm hover:shadow"
               >
-                <Wand2 className="w-3.5 h-3.5" />
+                <Wand2 className="w-3.5 h-3.5 shrink-0" />
                 <span>Format Code</span>
               </button>
-              
+
               <button
                 onClick={handleCopy}
-                className={`flex items-center space-x-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ring-1 ${
-                  copied 
-                    ? 'bg-green-50 text-green-600 ring-green-200 animate-in zoom-in-95' 
-                    : 'bg-indigo-600 text-white ring-indigo-500 hover:bg-indigo-700'
-                }`}
+                className={`flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-3 md:px-4 py-1.5 rounded-lg text-[11px] md:text-xs font-bold transition-all shadow-sm ring-1 ${copied
+                  ? 'bg-green-50 text-green-600 ring-green-200 animate-in zoom-in-95'
+                  : 'bg-indigo-600 text-white ring-indigo-500 hover:bg-indigo-700'
+                  }`}
               >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <Check className="w-3.5 h-3.5 shrink-0" /> : <Copy className="w-3.5 h-3.5 shrink-0" />}
                 <span>{copied ? 'Copied!' : 'Copy All'}</span>
               </button>
             </div>
           </div>
 
-          <div className="flex-1 h-full w-full bg-white relative">
+          <div className="w-full bg-white relative h-[450px] lg:h-auto lg:flex-1 flex flex-col">
             <Editor
               height="100%"
+              width="100%"
               language={language}
               value={text}
               theme="light"
@@ -289,18 +288,30 @@ export default function Room() {
                 folding: true,
                 matchBrackets: 'always',
                 automaticLayout: true,
+                wordWrap: 'on',
                 padding: { top: 20, bottom: 20 },
                 lineHeight: 1.6,
                 letterSpacing: 0,
                 cursorSmoothCaretAnimation: 'on',
                 smoothScrolling: true,
+                renderLineHighlight: 'none',
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'visible',
+                  useShadows: false,
+                  verticalScrollbarSize: 10,
+                  horizontalScrollbarSize: 10,
+                },
+                fixedOverflowWidgets: true,
+                quickSuggestions: false,
+                links: false,
               }}
               onChange={handleEditorChange}
               onMount={handleEditorDidMount}
               loading={<div className="flex items-center justify-center h-full text-gray-400">Loading editor...</div>}
             />
           </div>
-          
+
           <div className="bg-gray-50 border-t border-gray-200 px-6 py-2 flex justify-between items-center">
             <p className="text-[10px] text-gray-400 font-medium">
               Synced in realtime • Monaco Engine
@@ -314,10 +325,10 @@ export default function Room() {
         {/* Right: File Transfer */}
         <div className="w-full lg:w-80 shrink-0">
           <div className="sticky top-24">
-            <FileTransfer 
-              roomId={roomId!} 
-              files={files} 
-              onUploadSuccess={handleFileUploadSuccess} 
+            <FileTransfer
+              roomId={roomId!}
+              files={files}
+              onUploadSuccess={handleFileUploadSuccess}
             />
           </div>
         </div>
@@ -325,24 +336,24 @@ export default function Room() {
 
       {/* Share Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm transition-opacity">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl relative border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
-            <button 
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] transition-opacity">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl relative border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <button
               onClick={() => setShowShareModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 bg-gray-50 rounded-full"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
-            
+
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Share Room</h2>
-              <p className="text-gray-500 text-sm">Scan QR code or share the link</p>
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">Share Room</h2>
+              <p className="text-gray-500 text-xs md:sm">Scan QR code or share the link</p>
             </div>
-            
-            <div className="bg-gray-50 p-6 rounded-2xl flex justify-center items-center mb-6 border border-gray-100">
-              <QRCodeSVG 
-                value={roomUrl} 
-                size={200}
+
+            <div className="bg-gray-50 p-4 md:p-6 rounded-2xl flex justify-center items-center mb-6 border border-gray-100">
+              <QRCodeSVG
+                value={roomUrl}
+                size={window.innerWidth < 420 ? 160 : 200}
                 level="H"
                 includeMargin={false}
                 className="bg-white p-2 rounded-xl shadow-sm"
@@ -350,19 +361,19 @@ export default function Room() {
             </div>
 
             <div className="flex flex-col space-y-3">
-              <div className="flex text-sm">
-                <input 
-                  type="text" 
-                  readOnly 
-                  value={roomUrl} 
-                  className="flex-1 bg-gray-50 border border-gray-200 rounded-l-lg px-3 py-2 text-gray-600 focus:outline-none"
+              <div className="flex text-xs md:text-sm">
+                <input
+                  type="text"
+                  readOnly
+                  value={roomUrl}
+                  className="flex-1 bg-gray-50 border border-gray-200 rounded-l-lg px-3 py-2 text-gray-600 focus:outline-none overflow-hidden text-ellipsis"
                 />
-                <button 
+                <button
                   onClick={async () => {
                     await navigator.clipboard.writeText(roomUrl);
                     alert('Link copied!');
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-r-lg font-medium transition-colors"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 md:px-4 py-2 rounded-r-lg font-medium transition-colors whitespace-nowrap"
                 >
                   Copy
                 </button>

@@ -19,6 +19,7 @@ export interface FileMetadata {
   fileType: string;
   uploadedAt: string;
   downloadUrl: string;
+  ownerId: string;
 }
 
 export const SOCKET_EVENTS = {
@@ -28,7 +29,8 @@ export const SOCKET_EVENTS = {
   USER_DISCONNECTED: 'user-disconnected',
   ROOM_DATA: 'room-data',
   ERROR: 'error',
-  FILE_AVAILABLE: 'file-available'
+  FILE_AVAILABLE: 'file-available',
+  FILE_DELETED: 'file-deleted'
 } as const;
 
 export const MAX_TEXT_LENGTH = 10000;
