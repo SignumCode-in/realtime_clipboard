@@ -41,7 +41,13 @@ export default function FileTransfer({ roomId, userId, files, onUploadSuccess }:
       return;
     }
 
-    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    const isAllowedMimeType = ALLOWED_FILE_TYPES.includes(file.type);
+    const isTextExtension = file.name.toLowerCase().endsWith('.txt') || 
+                           file.name.toLowerCase().endsWith('.md') ||
+                           file.name.toLowerCase().endsWith('.json') ||
+                           file.name.toLowerCase().endsWith('.csv');
+
+    if (!isAllowedMimeType && !isTextExtension) {
       setError('Unsupported file type');
       return;
     }

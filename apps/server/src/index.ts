@@ -31,7 +31,8 @@ const io = new Server(server, {
     origin: '*', // For dev, in prod we'll serve static from same origin
     methods: ['GET', 'POST']
   },
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  maxHttpBufferSize: 2 * 1024 * 1024 // 2MB to handle larger text payloads
 });
 
 app.use(cors());
@@ -70,7 +71,12 @@ const upload = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (req, file, cb) => {
-    if (ALLOWED_FILE_TYPES.includes(file.mimetype)) {
+    const isAllowedMimeType = ALLOWED_FILE_TYPES.includes(file.mimetype);
+    const isTextExtension = file.originalname.toLowerCase().endsWith('.txt') || 
+                           file.originalname.toLowerCase().endsWith('.md') ||
+                           file.originalname.toLowerCase().endsWith('.json');
+    
+    if (isAllowedMimeType || isTextExtension) {
       cb(null, true);
     } else {
       cb(new Error(`Invalid file type: ${file.mimetype}`));
@@ -229,7 +235,7 @@ io.on('connection', (socket) => {
     if (!roomId || currentRoom !== roomId) return;
 
     if (typeof text !== 'string' || text.length > MAX_TEXT_LENGTH) {
-      socket.emit(SOCKET_EVENTS.ERROR, { message: 'Invalid text payload length' });
+      socket.emit(SOCKET_EVENTS.ERROR, { message: 'Text payload too large (max 1MB). Use File Transfer for bigger content.' });
       return;
     }
 

@@ -33,7 +33,7 @@ export const SOCKET_EVENTS = {
   FILE_DELETED: 'file-deleted'
 } as const;
 
-export const MAX_TEXT_LENGTH = 10000;
+export const MAX_TEXT_LENGTH = 1000000; // Increased to 1MB for larger text sharing
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 export const ALLOWED_FILE_TYPES = [
   'image/jpeg',
@@ -43,5 +43,8 @@ export const ALLOWED_FILE_TYPES = [
   'text/plain',
   'application/json',
   'application/zip',
-  'application/x-zip-compressed'
+  'application/x-zip-compressed',
+  'text/markdown',
+  'text/csv',
+  '' // Allow unknown types for flexibility, especially with large text files
 ];
