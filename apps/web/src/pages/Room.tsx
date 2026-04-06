@@ -101,8 +101,15 @@ export default function Room() {
       setFiles((prev) => prev.filter(f => f.fileId !== fileId));
     };
 
+    const onConnectError = (err: any) => {
+      console.error('Socket connection error:', err);
+      setErrorMsg(`Could not connect to the server: ${err.message || 'Unknown error'}`);
+      setLoading(false);
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onConnectError);
     socket.on(SOCKET_EVENTS.ERROR, onError);
     socket.on(SOCKET_EVENTS.ROOM_DATA, onRoomData);
     socket.on(SOCKET_EVENTS.TEXT_UPDATE, onTextUpdate);
@@ -111,6 +118,8 @@ export default function Room() {
 
     if (socket.connected) {
       onConnect();
+    } else {
+      socket.connect();
     }
 
     // Update document title for SEO and better UX
@@ -120,6 +129,7 @@ export default function Room() {
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onConnectError);
       socket.off(SOCKET_EVENTS.ERROR, onError);
       socket.off(SOCKET_EVENTS.ROOM_DATA, onRoomData);
       socket.off(SOCKET_EVENTS.TEXT_UPDATE, onTextUpdate);
