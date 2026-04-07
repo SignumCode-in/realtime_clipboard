@@ -1,5 +1,6 @@
 import express from 'express';
 import http from 'http';
+import https from 'https';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
@@ -259,6 +260,24 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Self-ping to keep the server awake on Render's free tier
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+if (RENDER_EXTERNAL_URL) {
+  // Use a slightly shorter interval than 15 mins (Render's sleep timeout)
+  setInterval(() => {
+    const protocol = RENDER_EXTERNAL_URL.startsWith('https') ? https : http;
+    protocol.get(`${RENDER_EXTERNAL_URL}/ping`, (res) => {
+      console.log(`Self-ping status: ${res.statusCode}`);
+    }).on('error', (err) => {
+      console.error(`Self-ping error: ${err.message}`);
+    });
+  }, 14 * 60 * 1000); // 14 mins
+}
+
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

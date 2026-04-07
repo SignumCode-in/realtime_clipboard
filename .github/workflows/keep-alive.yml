@@ -1,0 +1,22 @@
+name: Keep Alive
+on:
+  schedule:
+    - cron: '*/14 * * * *' # Every 14 minutes
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Server
+        env:
+          # In GitHub repo settings, add a secret named RENDER_SERVER_URL
+          # with your actual RENDER server URL (e.g., https://yourapp.onrender.com/ping)
+          RENDER_SERVER_URL: ${{ secrets.RENDER_SERVER_URL }}
+        run: |
+          if [ -z "$RENDER_SERVER_URL" ]; then
+            echo "RENDER_SERVER_URL secret not found. Skipping ping."
+            exit 0
+          fi
+          echo "Pinging $RENDER_SERVER_URL..."
+          curl -f -s "$RENDER_SERVER_URL" || echo "Ping failed (but that's okay, maybe it's still waking up!)"
